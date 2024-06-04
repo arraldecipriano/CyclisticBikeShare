@@ -1,0 +1,231 @@
+---
+title: "Cyclistic Bike Share"
+author: "Cipriano Arralde"
+date: "2024-06-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setting my environment
+```{r Uploading libraries}
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(janitor)
+library(tidyr)
+library(readr)
+library(skimr)
+library(dplyr)
+```
+
+## Uploading the data
+
+Downloaded the 12 month of 2021 from the link provided by the case study guide, [link here](https://divvy-tripdata.s3.amazonaws.com/index.html)
+
+#### Loading up my files
+```{r Uploading files, message=FALSE, warning=FALSE}
+jan2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202101-divvy-tripdata.csv")
+feb2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202102-divvy-tripdata.csv")
+mar2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202103-divvy-tripdata.csv")
+apr2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202104-divvy-tripdata.csv")
+may2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202105-divvy-tripdata.csv")
+jun2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202106-divvy-tripdata.csv")
+jul2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202107-divvy-tripdata.csv")
+aug2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202108-divvy-tripdata.csv")
+sep2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202109-divvy-tripdata.csv")
+oct2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202110-divvy-tripdata.csv")
+nov2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202111-divvy-tripdata.csv")
+dec2021 <- read.csv("C:/Users/Cipriano/Documents/2021/202112-divvy-tripdata.csv")
+```
+
+## Creating the data frames
+
+#### Combined all 12 files into one data fram
+
+```{r Created initial data frame, message=FALSE, warning=FALSE}
+cyclistic_2021_trips <- rbind(jan2021, feb2021, mar2021, apr2021, may2021, jun2021, jul2021, aug2021, sep2021, oct2021, nov2021, dec2021)
+```
+
+#### Selected columns for analysis
+
+```{r Trimmed data frame, message=FALSE, warning=FALSE}
+trimmed_cyclistic <- select(cyclistic_2021_trips, "rideable_type", "started_at", "ended_at", "member_casual")
+```
+
+#### Created second data frame for calculations
+
+```{r Second data frame, message=FALSE, warning=FALSE}
+final_cyclistic <- trimmed_cyclistic
+```
+
+## Cleaning
+
+#### Created new column for the duration of the ride, then rounded the result to 1 decimal
+
+```{r Trip duration column, message=FALSE, warning=FALSE}
+final_cyclistic$ride_length <- difftime(final_cyclistic$ended_at, final_cyclistic$started_at, units = "mins") # Ride length column
+final_cyclistic$ride_length <- round(final_cyclistic$ride_length, digits = 1) # Rounded to 1 decimal
+```
+
+#### Created date column with datetime format
+
+```{r Date column, message=FALSE, warning=FALSE}
+final_cyclistic$date <- as.POSIXlt(final_cyclistic$started_at, format = "%Y-%m-%d %H:%M") # Date column, datetime format
+```
+
+#### Exctracted the day of the week
+
+```{r Weekday column, message=FALSE, warning=FALSE}
+final_cyclistic$weekday <- weekdays(final_cyclistic$date) # Weekday column
+```
+
+#### Extracted the month
+
+```{r Month column, message=FALSE, warning=FALSE}
+final_cyclistic$month <- format(as.Date(final_cyclistic$date), "%m") # Month column
+```
+
+#### Extracted the year
+
+```{r Year column, message=FALSE, warning=FALSE}
+final_cyclistic$year <- format(as.Date(final_cyclistic$date), "%Y") # Year column
+```
+
+#### Extracted the day number
+
+```{r Day column, message=FALSE, warning=FALSE}
+final_cyclistic$day <- format(as.Date(final_cyclistic$date), "%d") # Day column
+```
+
+#### Extracted the hour
+
+```{r Hour column, message=FALSE, warning=FALSE}
+final_cyclistic$hour <- hour(final_cyclistic$date) # Hour column
+```
+
+#### Discarded duplicates and blanks
+
+```{r Removed blanks and duplicates, message=FALSE, warning=FALSE}
+final_cyclistic <- na.omit(final_cyclistic) # Removing blanks
+final_cyclistic <- distinct(final_cyclistic) # Removing duplicates
+```
+
+
+#### Discarded values with trip duration <= 0
+
+```{r Trip duration less or equal than 0, message=FALSE, warning=FALSE}
+cyclistic_2021_df <- final_cyclistic[!(final_cyclistic$ride_length <= 0),] # New data frame, discarded rows where trip_duration <= 0
+```
+
+#### Renamed columns
+
+```{r Renamed columns, message=FALSE, warning=FALSE}
+cyclistic_2021_df <- cyclistic_2021_df %>% 
+                      rename(bike_type = rideable_type,
+                             trip_duration = ride_length,
+                             user_type = member_casual) # Renaming some of the columns for personal preference
+```
+
+#### Created last data frame
+
+```{r Last data frame, message=FALSE, warning=FALSE}
+cyclistic_final_df <- select(cyclistic_2021_df, "hour",
+                             "weekday", "day", "month", "year",
+                             "bike_type", "user_type", "trip_duration") # Last data frame, cleaned and organized
+```
+
+## Quick Statistics
+
+- **5.586.693** total rides
+- **22 min** general average trip duration
+- **Summer** busiest season
+- **2.526.236 (45%)** total rides for **casual** users
+- **3.060.457 (55%)** total rides for **member** users
+- **32 min** average trip duration for **casual** users
+- **13 min** average trip duration for **member** users
+- **Saturday** busiest day for **casual** users
+- **Wednesday** busiest day for **member** users
+- **July** busiest month for **casual** users
+- **September** busiest month for **member** users
+
+## Vizzes
+
+#### Total Trips By User Type
+
+```{r Total Trips By User Type}
+cyclistic_final_df %>% 
+  group_by(user_type) %>% 
+  summarize(num_of_rides = n()) %>%
+  arrange(user_type) %>% 
+  ggplot(aes(x = user_type, y = num_of_rides, fill = user_type)) +
+  labs(title = "Total Trips By User Type") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) + 
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
+#### Average Trip Duration By User Type 
+
+```{r Average Trip Duration By User Type}
+cyclistic_final_df %>% 
+  group_by(user_type) %>% 
+  summarize(avg_trip_duration = mean(trip_duration)) %>% 
+  arrange(user_type) %>% 
+  ggplot(aes(x = user_type, y = avg_trip_duration, fill = user_type)) +
+  labs(title = "Average Trip Duration By User Type") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
+#### Busiest Week By User Type
+
+```{r Busiest Week By User Type}
+cyclistic_final_df %>% 
+  group_by(user_type, weekday) %>% 
+  summarize(num_of_rides = n()) %>% 
+  arrange(user_type, num_of_rides) %>% 
+  ggplot(aes(x = weekday, y = num_of_rides, fill = user_type)) +
+  labs(title = "Busiest Week Day By User Type") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
+#### Total Monthly Rides By User Type
+
+```{r Total Monthly Rides By User Type}
+cyclistic_final_df %>%
+  group_by(user_type, month)%>%
+  summarize(num_of_rides = n())%>%
+  arrange(user_type, month)%>%
+  ggplot(aes(x = month, y = num_of_rides, fill = user_type)) +
+  labs(title = "Total User Rides By Month") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
+#### Most Popular Bike Type
+
+```{r Most Popular Bike Type}
+cyclistic_final_df %>% 
+  group_by(bike_type, user_type) %>% 
+  summarize(num_of_rides = n()) %>% 
+  ggplot(aes(x = bike_type, y = num_of_rides, fill = user_type)) +
+  labs(title = "Most Used Bike Type") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
+#### Busiest Month By User Type
+
+```{r Busiest Month By User Type}
+cyclistic_final_df %>% 
+  group_by(month, user_type) %>% 
+  summarize(num_of_rides = n()) %>% 
+  ggplot(aes(x = month, y = num_of_rides, fill = user_type)) +
+  labs(title = "Number User Rides By Month") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+```
+
